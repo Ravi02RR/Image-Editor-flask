@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, flash
 from werkzeug.utils import secure_filename
 import os
 import cv2
+
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'png', 'webp', 'jpg', 'jpeg', 'gif', 'gif'}
 
@@ -19,12 +20,17 @@ def processimage(filename, operation):
     print(f"the operation is {operation} and filename is {filename}")
     img = cv2.imread(f"uploads/{filename}")
 
-    match operation:
-        case "cgrey":
-            imgProcessed = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            cv2.imwrite(f"static/{filename}", imgProcessed)
+    if operation == "cgrey":
+        imgProcessed = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        newFilename = f"static/{filename}"
+        cv2.imwrite(newFilename, imgProcessed)
+        return newFilename
+    elif operation in ["cwebp", "cpng", "cjpg"]:
+        newFilename = f"static/{os.path.splitext(filename)[0]}.webp"
+        cv2.imwrite(newFilename, img)
+        return newFilename
 
-    pass
+    return None
 
 
 @app.route("/")
@@ -44,15 +50,20 @@ def edit():
         # empty file without a filename.
         if file.filename == '':
             flash('No selected file')
-            return "error no file slected"
+            return "error no file selected"
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-            processimage(filename, operation)
-            flash(
-                f"Your image has been processed and is available <a href='/static/{filename}' target= '_blank'>Here..</a> here.")
+            new_filename = processimage(filename, operation)
+            if new_filename:
+                flash(
+                    f"Your image has been processed and is available <a href='/{new_filename}' target='_blank'>Here</a>.")
+            else:
+                flash("Invalid operation")
+
             return render_template("index.html")
 
 
-app.run(debug=True, port=5001)
+if __name__ == "__main__":
+    app.run(debug=True, port=5001)
